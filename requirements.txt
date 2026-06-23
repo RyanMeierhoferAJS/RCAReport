@@ -1,5 +1,6 @@
 python-telegram-bot==21.3
 anthropic>=0.40.0
+openai>=1.30.0
 supabase>=2.9.0
 apscheduler>=3.10.4
 python-dotenv>=1.0.0
