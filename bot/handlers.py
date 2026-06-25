@@ -155,20 +155,46 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         buf.seek(0)
 
         document = docx.Document(buf)
-        full_text = "\n".join(p.text for p in document.paragraphs if p.text.strip())
+
+        # Extract paragraphs
+        para_text = "\n".join(p.text for p in document.paragraphs if p.text.strip())
+
+        # Extract tables (PDPs are almost always in table format)
+        table_lines = []
+        for table in document.tables:
+            for row in table.rows:
+                cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                # Deduplicate merged cells (python-docx repeats merged cell text)
+                seen = []
+                for c in cells:
+                    if not seen or c != seen[-1]:
+                        seen.append(c)
+                if seen:
+                    table_lines.append(" | ".join(seen))
+
+        table_text = "\n".join(table_lines)
+        full_text = "\n\n".join(filter(None, [para_text, table_text]))
 
         if not full_text.strip():
             await update.message.reply_text("The document appears to be empty or unreadable.")
             return
+
+        logger.info("PDP document extracted %d chars (%d para, %d table rows)",
+                    len(full_text), len(para_text.splitlines()), len(table_lines))
 
         await update.message.reply_text("_Extracting PDP actions with AI…_", parse_mode="Markdown")
         result = extract_pdp_from_document(full_text)
 
         actions = result.get("pdp_actions", [])
         if not actions:
+            preview = full_text[:500].replace("_", "\\_").replace("*", "\\*")
             await update.message.reply_text(
-                "Couldn't find any PDP actions in that document. "
-                "Make sure it contains your objectives/actions as paragraphs or bullet points."
+                "Couldn't extract PDP actions — here's what I read from the document "
+                "(first 500 chars):\n\n"
+                f"`{preview}`\n\n"
+                "If this looks wrong, the document may use a format I can't read yet. "
+                "Try copy-pasting the content as a plain text message instead.",
+                parse_mode="Markdown",
             )
             return
 
