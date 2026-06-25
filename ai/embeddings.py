@@ -28,3 +28,7 @@ def embed_career_event(type: str, title: str, description: str | None, project: 
 def embed_note(content: str, tags: list[str], entities: list[str], project: str | None) -> list[float]:
     parts = [content, project] + tags + entities
     return embed(" ".join(filter(None, parts)))
+
+
+def embed_idea(title: str, description: str | None, category: str | None, project: str | None) -> list[float]:
+    return embed(" ".join(filter(None, [title, description, category, project])))

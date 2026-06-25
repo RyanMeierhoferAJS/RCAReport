@@ -1,11 +1,14 @@
 import logging
+from datetime import date
 from telegram import Update
 from telegram.ext import ContextTypes
 from modules import tasks, decisions, career
 from modules.digest import get_daily_digest
 from modules.weekly_report import get_weekly_report
 from modules.search import search_and_answer, build_context_from_results
-from ai.router import deep_analysis
+from modules.ideas import get_formatted_ideas, format_ideas_for_export
+from modules.pdp import get_pdp_summary, format_pdp_for_export, format_pdp_for_ai_analysis
+from ai.router import deep_analysis, analyse_pdp, generate_export
 from db import client as db
 
 logger = logging.getLogger(__name__)
@@ -14,16 +17,21 @@ logger = logging.getLogger(__name__)
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "*PIA — Personal Intelligence Agent*\n\n"
-        "Send me anything naturally — I'll extract tasks, decisions and achievements automatically.\n\n"
-        "*Commands*\n"
+        "Send me anything naturally — I'll extract tasks, decisions, achievements and ideas automatically.\n\n"
+        "*Capture*\n"
         "/tasks — open tasks\n"
         "/decisions — recent decisions\n"
         "/career — career journal\n"
+        "/ideas — idea bank\n"
+        "/pdp — development plan\n\n"
+        "*Reporting*\n"
         "/digest — morning briefing\n"
         "/report — weekly report\n"
         "/search \\[query\\] — search memory\n"
-        "/think \\[prompt\\] — deep analysis\n"
-        "/deep \\[prompt\\] — deep analysis\n"
+        "/think \\[prompt\\] — deep analysis\n\n"
+        "*AI Exports*\n"
+        "/export — Claude Code context block\n"
+        "/pdp analyse — AI review of your PDP progress\n\n"
         "/help — show this",
         parse_mode="Markdown",
     )
@@ -77,3 +85,120 @@ async def cmd_think(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ctx_text = build_context_from_results(results)
     result = deep_analysis(query, ctx_text or "No relevant context found in memory.")
     await update.message.reply_text(result, parse_mode="Markdown")
+
+
+async def cmd_ideas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    status_filter = context.args[0].lower() if context.args else None
+    valid = {"raw", "refined", "parked", "shipped"}
+    if status_filter and status_filter not in valid:
+        await update.message.reply_text(
+            "Usage: /ideas \\[raw|refined|parked|shipped\\]", parse_mode="Markdown"
+        )
+        return
+    await update.message.reply_text(get_formatted_ideas(status_filter), parse_mode="Markdown")
+
+
+async def cmd_pdp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    args = context.args or []
+
+    if not args:
+        await update.message.reply_text(get_pdp_summary(), parse_mode="Markdown")
+        return
+
+    subcmd = args[0].lower()
+
+    if subcmd == "add":
+        rest = " ".join(args[1:])
+        parts = [p.strip() for p in rest.split("|")]
+        if not parts[0]:
+            await update.message.reply_text(
+                "Usage: `/pdp add Title | category | objective`\n"
+                "Categories: leadership, technical, commercial, personal",
+                parse_mode="Markdown",
+            )
+            return
+        title = parts[0]
+        category = parts[1] if len(parts) > 1 else "general"
+        objective = parts[2] if len(parts) > 2 else None
+        db.create_pdp_action(title=title, category=category, objective=objective)
+        await update.message.reply_text(f"✅ PDP action added: *{title}*", parse_mode="Markdown")
+
+    elif subcmd in ("analyse", "analyze"):
+        await update.message.reply_text("_Analysing your PDP…_", parse_mode="Markdown")
+        actions = db.get_pdp_actions()
+        if not actions:
+            await update.message.reply_text(
+                "No PDP actions yet. Add one with `/pdp add`.", parse_mode="Markdown"
+            )
+            return
+        pdp_text = format_pdp_for_ai_analysis(actions)
+        result = analyse_pdp(pdp_text)
+        await update.message.reply_text(result, parse_mode="Markdown")
+
+    elif subcmd == "exceeded":
+        rest = " ".join(args[1:])
+        parts = [p.strip() for p in rest.split("|")]
+        if len(parts) < 2:
+            await update.message.reply_text(
+                "Usage: `/pdp exceeded Title | evidence of exceeding`",
+                parse_mode="Markdown",
+            )
+            return
+        action_title, evidence_text = parts[0], parts[1]
+        actions = db.get_pdp_actions()
+        matched = next(
+            (a for a in actions if action_title.lower() in a["title"].lower()), None
+        )
+        if not matched:
+            await update.message.reply_text(
+                f"No PDP action found matching: {action_title}", parse_mode="Markdown"
+            )
+            return
+        db.add_pdp_evidence(matched["id"], evidence_text, new_status="exceeded")
+        await update.message.reply_text(
+            f"⭐ Marked as *exceeded*: {matched['title']}\nEvidence: _{evidence_text}_",
+            parse_mode="Markdown",
+        )
+
+    else:
+        await update.message.reply_text(
+            "*PDP commands:*\n"
+            "/pdp — dashboard\n"
+            "/pdp add Title | category | objective\n"
+            "/pdp exceeded Title | evidence\n"
+            "/pdp analyse — AI analysis of your progress",
+            parse_mode="Markdown",
+        )
+
+
+async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text("_Generating Claude Code context export…_", parse_mode="Markdown")
+
+    ideas = db.get_ideas(limit=30)
+    pdp_actions = db.get_pdp_actions()
+    open_tasks = db.get_open_tasks()
+
+    ideas_text = format_ideas_for_export(ideas)
+    pdp_text = format_pdp_for_export(pdp_actions)
+
+    top_tasks = "\n".join(
+        f"• [{t.get('priority', 'med').upper()}] {t['title']}"
+        + (f" ({t['project']})" if t.get("project") else "")
+        for t in open_tasks[:10]
+    ) or "No open tasks."
+
+    data = f"""DATE: {date.today().isoformat()}
+
+OPEN TASKS (top 10):
+{top_tasks}
+
+IDEAS:
+{ideas_text}
+
+PDP ACTIONS:
+{pdp_text}
+"""
+
+    export_block = generate_export(data)
+    header = f"*PIA Brain Export — {date.today().isoformat()}*\nPaste this at the start of a Claude Code session:\n\n"
+    await update.message.reply_text(header + f"```\n{export_block}\n```", parse_mode="Markdown")

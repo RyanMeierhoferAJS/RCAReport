@@ -6,6 +6,7 @@ from config import ANTHROPIC_API_KEY, TIER_1_MODEL, TIER_2_MODEL, TIER_3_MODEL
 from ai.prompts import (
     EXTRACTION_SYSTEM, QUESTION_SYSTEM,
     DIGEST_SYSTEM, WEEKLY_REPORT_SYSTEM, DEEP_SYSTEM,
+    PDP_ANALYSIS_SYSTEM, EXPORT_SYSTEM,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,3 +69,14 @@ def deep_analysis(query: str, context: str) -> str:
     today = date.today().isoformat()
     system = DEEP_SYSTEM.format(today=today, context=context)
     return _call(TIER_3_MODEL, system, query, max_tokens=3000)
+
+
+def analyse_pdp(pdp_data: str) -> str:
+    today = date.today().isoformat()
+    system = PDP_ANALYSIS_SYSTEM.format(today=today, pdp_data=pdp_data)
+    return _call(TIER_2_MODEL, system, "Analyse my PDP progress and tell me what I need to do to exceed every action.", max_tokens=1500)
+
+
+def generate_export(data: str) -> str:
+    system = EXPORT_SYSTEM.format(data=data)
+    return _call(TIER_2_MODEL, system, "Generate the Claude Code context block.", max_tokens=800)

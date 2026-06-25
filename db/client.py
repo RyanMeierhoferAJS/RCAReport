@@ -199,6 +199,118 @@ def update_project_activity(project_name: str) -> None:
     }).ilike("name", f"%{project_name}%").execute()
 
 
+# ── Ideas ─────────────────────────────────────────────────────────────────────
+
+def create_idea(title: str, description: str | None = None, category: str = "general",
+                project: str | None = None, source_capture_id: str | None = None) -> dict:
+    from ai.embeddings import embed_idea
+    embedding = embed_idea(title, description, category, project)
+    result = get_client().table("ideas").insert({
+        "title": title,
+        "description": description,
+        "category": category,
+        "status": "raw",
+        "project": project,
+        "source_capture_id": source_capture_id,
+        "embedding": embedding,
+    }).execute()
+    return result.data[0]
+
+
+def get_ideas(status: str | None = None, limit: int = 50) -> list[dict]:
+    q = (
+        get_client().table("ideas")
+        .select("id, title, description, category, status, project, created_at")
+        .order("created_at", desc=True)
+    )
+    if status:
+        q = q.eq("status", status)
+    return q.limit(limit).execute().data
+
+
+def update_idea_status(idea_id: str, status: str) -> dict:
+    result = (
+        get_client().table("ideas")
+        .update({"status": status, "updated_at": datetime.utcnow().isoformat()})
+        .eq("id", idea_id)
+        .execute()
+    )
+    return result.data[0]
+
+
+def semantic_search_ideas(embedding: list[float], threshold: float = 0.45) -> list[dict]:
+    result = get_client().rpc("semantic_search_ideas", {
+        "query_embedding": embedding,
+        "similarity_threshold": threshold,
+        "match_count": 10,
+    }).execute()
+    return result.data
+
+
+# ── PDP Actions ───────────────────────────────────────────────────────────────
+
+def create_pdp_action(title: str, description: str | None = None, category: str = "general",
+                      objective: str | None = None, target_date: str | None = None) -> dict:
+    result = get_client().table("pdp_actions").insert({
+        "title": title,
+        "description": description,
+        "category": category,
+        "objective": objective,
+        "target_date": target_date,
+        "status": "not_started",
+    }).execute()
+    return result.data[0]
+
+
+def get_pdp_actions(status: str | None = None) -> list[dict]:
+    q = (
+        get_client().table("pdp_actions")
+        .select("*")
+        .order("category")
+        .order("created_at")
+    )
+    if status:
+        q = q.eq("status", status)
+    return q.execute().data
+
+
+def add_pdp_evidence(pdp_id: str, evidence_text: str, new_status: str | None = None) -> dict:
+    existing = (
+        get_client().table("pdp_actions")
+        .select("evidence, status")
+        .eq("id", pdp_id)
+        .execute()
+    )
+    current = existing.data[0]
+    evidence = list(current.get("evidence") or [])
+    evidence.append(evidence_text)
+
+    update: dict = {
+        "evidence": evidence,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    if new_status:
+        update["status"] = new_status
+
+    result = (
+        get_client().table("pdp_actions")
+        .update(update)
+        .eq("id", pdp_id)
+        .execute()
+    )
+    return result.data[0]
+
+
+def update_pdp_status(pdp_id: str, status: str) -> dict:
+    result = (
+        get_client().table("pdp_actions")
+        .update({"status": status, "updated_at": datetime.utcnow().isoformat()})
+        .eq("id", pdp_id)
+        .execute()
+    )
+    return result.data[0]
+
+
 # ── Semantic search across all tables ─────────────────────────────────────────
 
 def full_search(query: str) -> dict[str, list[dict]]:
@@ -209,6 +321,7 @@ def full_search(query: str) -> dict[str, list[dict]]:
         "decisions":     semantic_search_decisions(query_embedding),
         "career_events": semantic_search_career(query_embedding),
         "notes":         semantic_search_notes(query_embedding),
+        "ideas":         semantic_search_ideas(query_embedding),
     }
 
 

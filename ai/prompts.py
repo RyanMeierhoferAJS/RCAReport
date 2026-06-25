@@ -6,7 +6,7 @@ Analyse the message and extract structured information. Respond ONLY with valid 
 
 Return exactly this structure:
 {{
-  "classification": "task|decision|achievement|question|general",
+  "classification": "task|decision|achievement|idea|pdp|question|general",
   "tasks": [
     {{
       "title": "concise action title",
@@ -42,6 +42,21 @@ Return exactly this structure:
       "project": "project name or null"
     }}
   ],
+  "ideas": [
+    {{
+      "title": "concise idea title",
+      "description": "optional expansion",
+      "category": "product|process|research|personal|general",
+      "project": "project name or null"
+    }}
+  ],
+  "pdp_evidence": [
+    {{
+      "action_title": "partial match to PDP action title",
+      "evidence": "what was done that counts as evidence",
+      "exceeded": true
+    }}
+  ],
   "projects_mentioned": ["project names found in message"],
   "response": "brief conversational confirmation for Ryan (1-2 sentences)"
 }}
@@ -52,10 +67,13 @@ Classification rules:
 - task: something that needs doing — "need to", "must", "order", "book", "call", "send", "check"
 - decision: a choice that was made — "decided", "going with", "chose", "will use", "agreed"
 - achievement: something accomplished — "completed", "finished", "avoided £X", "delivered", "got qualification"
+- idea: creative thought, concept, proposal — "idea:", "what if", "could we", "thinking about building", "concept:"
+- pdp: evidence toward personal development plan — "PDP:", "that counts toward", "exceeded my", "for my review"
 - question: asks for information — ends with "?", starts with what/who/when/where/how/which/why/show/list/find
-- general: thoughts, ideas, notes that don't fit above
+- general: everything else
 
-A message can have multiple classifications (e.g. a task AND a decision). Use the dominant one for "classification".
+A message can contain multiple types. Use the dominant one for "classification".
+Only populate arrays when relevant — leave empty if nothing found.
 Always populate "response" with a natural, brief confirmation.
 """
 
@@ -131,4 +149,29 @@ Provide structured, insightful output with headers.
 
 Relevant context from memory:
 {context}
+"""
+
+PDP_ANALYSIS_SYSTEM = """You are analysing Ryan's Personal Development Plan progress.
+
+Today's date: {today}
+
+Review the PDP actions below and provide:
+1. Overall assessment — is Ryan on track to EXCEED (not just meet) his objectives?
+2. Per-action status with evidence strength
+3. Gaps — what evidence is missing?
+4. Specific recommendations to exceed each action
+
+Be direct, specific, honest. This is for Ryan's professional development review.
+
+PDP Data:
+{pdp_data}
+"""
+
+EXPORT_SYSTEM = """Generate a concise context block for Claude Code.
+Ryan uses this to load his current ideas and PDP status into AI coding sessions.
+
+Format as clean markdown. Under 600 words. Be specific and useful.
+
+Data:
+{data}
 """

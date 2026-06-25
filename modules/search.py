@@ -58,6 +58,13 @@ def _semantic_context(query: str) -> str:
                 for n in results["notes"]
             ))
 
+        if results.get("ideas"):
+            parts.append("RELEVANT IDEAS:\n" + "\n".join(
+                f"- [{e.get('category', 'general')}] {e['title']}"
+                + (f" — {e['description'][:200]}" if e.get("description") else "")
+                for e in results["ideas"]
+            ))
+
         return "\n\n".join(parts)
     except Exception:
         logger.warning("Semantic search failed, using base context only")
@@ -94,6 +101,13 @@ def build_context_from_results(results: dict[str, list[dict]]) -> str:
         parts.append("NOTES:\n" + "\n".join(
             f"- {n['content'][:300]}"
             for n in results["notes"]
+        ))
+
+    if results.get("ideas"):
+        parts.append("IDEAS:\n" + "\n".join(
+            f"- [{e.get('category', 'general')}] {e['title']}"
+            + (f" — {e['description'][:200]}" if e.get("description") else "")
+            for e in results["ideas"]
         ))
 
     return "\n\n".join(parts)

@@ -89,6 +89,31 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             source_capture_id=capture_id,
         )
 
+    for idea in extracted.get("ideas", []):
+        db.create_idea(
+            title=idea["title"],
+            description=idea.get("description"),
+            category=idea.get("category", "general"),
+            project=idea.get("project"),
+            source_capture_id=capture_id,
+        )
+        stored.append(f"💡 *Idea:* {idea['title']}")
+
+    for pdp_ev in extracted.get("pdp_evidence", []):
+        action_title = pdp_ev.get("action_title", "")
+        evidence_text = pdp_ev.get("evidence", "")
+        exceeded = pdp_ev.get("exceeded", False)
+        if action_title and evidence_text:
+            actions = db.get_pdp_actions()
+            matched = next(
+                (a for a in actions if action_title.lower() in a["title"].lower()),
+                None,
+            )
+            if matched:
+                new_status = "exceeded" if exceeded else "in_progress"
+                db.add_pdp_evidence(matched["id"], evidence_text, new_status)
+                stored.append(f"📈 *PDP evidence logged* for: {matched['title']}")
+
     # Update last_activity on any mentioned projects
     for project in extracted.get("projects_mentioned", []):
         try:
