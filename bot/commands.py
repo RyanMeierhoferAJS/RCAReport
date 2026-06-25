@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import date
 from telegram import Update
@@ -35,6 +36,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "*AI Exports*\n"
         "/export — Claude Code context block\n"
         "/pdp analyse — AI review of your PDP progress\n\n"
+        "*Integrations*\n"
+        "/connect — link Microsoft 365 \\(calendar \\+ email\\)\n\n"
         "/help — show this",
         parse_mode="Markdown",
     )
@@ -240,6 +243,44 @@ async def cmd_pdp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "/pdp analyse — AI analysis of your progress",
             parse_mode="Markdown",
         )
+
+
+async def cmd_connect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from modules.graph import start_device_code_flow, run_device_code_polling, _is_configured
+    if not _is_configured():
+        await update.message.reply_text(
+            "❌ `GRAPH_TENANT_ID` and `GRAPH_CLIENT_ID` must be set in Railway env vars first.",
+            parse_mode="Markdown",
+        )
+        return
+
+    try:
+        flow = start_device_code_flow()
+    except Exception as exc:
+        await update.message.reply_text(
+            f"❌ Couldn't start Microsoft login: `{exc}`\n\nCheck GRAPH\\_TENANT\\_ID and GRAPH\\_CLIENT\\_ID.",
+            parse_mode="Markdown",
+        )
+        return
+
+    user_code        = flow["user_code"]
+    verification_uri = flow.get("verification_uri", "https://microsoft.com/devicelogin")
+    expires_in       = flow.get("expires_in", 900)
+    interval         = flow.get("interval", 5)
+    device_code      = flow["device_code"]
+
+    await update.message.reply_text(
+        f"*Connect PIA to Microsoft 365*\n\n"
+        f"1\\. Open: {verification_uri}\n"
+        f"2\\. Enter code: `{user_code}`\n"
+        f"3\\. Sign in with your AJS account \\(ryan\\.meierhofer@ajsassetcare\\.co\\.uk\\)\n\n"
+        f"_Code expires in {expires_in // 60} minutes\\. I'll notify you when connected\\._",
+        parse_mode="MarkdownV2",
+    )
+
+    asyncio.ensure_future(
+        run_device_code_polling(context.application, device_code, interval, expires_in)
+    )
 
 
 async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

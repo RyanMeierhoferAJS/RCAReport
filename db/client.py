@@ -337,6 +337,23 @@ def full_search(query: str) -> dict[str, list[dict]]:
     }
 
 
+# ── OAuth tokens ──────────────────────────────────────────────────────────────
+
+def get_oauth_token(key: str) -> dict | None:
+    result = get_client().table("oauth_tokens").select("*").eq("key", key).execute()
+    return result.data[0] if result.data else None
+
+
+def save_oauth_token(key: str, access_token: str, refresh_token: str, expires_at: int) -> None:
+    get_client().table("oauth_tokens").upsert({
+        "key":           key,
+        "access_token":  access_token,
+        "refresh_token": refresh_token,
+        "expires_at":    expires_at,
+        "updated_at":    datetime.utcnow().isoformat(),
+    }).execute()
+
+
 # ── Report storage ────────────────────────────────────────────────────────────
 
 def store_weekly_report(content: str, week_ending: date) -> None:
