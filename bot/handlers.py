@@ -1,7 +1,8 @@
+import io
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
-from ai.router import extract_from_message
+from ai.router import extract_from_message, extract_pdp_from_document
 from modules.search import search_and_answer
 from db import client as db
 
@@ -131,8 +132,75 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_text(reply, parse_mode="Markdown")
 
 
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    doc = update.message.document
+    fname = doc.file_name or ""
+
+    if not (fname.endswith(".docx") or fname.endswith(".doc")):
+        await update.message.reply_text(
+            "Send me a `.docx` file and I'll extract your PDP actions from it automatically.\n"
+            "_(PDF support coming soon)_",
+            parse_mode="Markdown",
+        )
+        return
+
+    await update.message.reply_text("_Reading your PDP document…_", parse_mode="Markdown")
+
+    try:
+        import docx  # python-docx
+
+        tg_file = await doc.get_file()
+        buf = io.BytesIO()
+        await tg_file.download_to_memory(buf)
+        buf.seek(0)
+
+        document = docx.Document(buf)
+        full_text = "\n".join(p.text for p in document.paragraphs if p.text.strip())
+
+        if not full_text.strip():
+            await update.message.reply_text("The document appears to be empty or unreadable.")
+            return
+
+        await update.message.reply_text("_Extracting PDP actions with AI…_", parse_mode="Markdown")
+        result = extract_pdp_from_document(full_text)
+
+        actions = result.get("pdp_actions", [])
+        if not actions:
+            await update.message.reply_text(
+                "Couldn't find any PDP actions in that document. "
+                "Make sure it contains your objectives/actions as paragraphs or bullet points."
+            )
+            return
+
+        saved = []
+        for action in actions:
+            if not action.get("title"):
+                continue
+            db.create_pdp_action(
+                title=action["title"],
+                description=action.get("description"),
+                category=action.get("category", "general"),
+                objective=action.get("objective"),
+                target_date=action.get("target_date"),
+            )
+            cat = action.get("category", "general").capitalize()
+            saved.append(f"✅ [{cat}] {action['title']}")
+
+        summary = result.get("summary", "")
+        header = f"*PDP imported — {len(saved)} actions loaded*"
+        if summary:
+            header += f"\n_{summary}_"
+
+        reply = header + "\n\n" + "\n".join(saved)
+        reply += "\n\nUse `/pdp` to view your dashboard, or `/pdp analyse` for an AI gap analysis."
+        await update.message.reply_text(reply, parse_mode="Markdown")
+
+    except Exception:
+        logger.exception("Document PDP import failed")
+        await update.message.reply_text("Something went wrong reading the document — please try again.")
+
+
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Placeholder — voice transcription (Whisper) coming in Phase 1.1
     await update.message.reply_text(
         "Voice notes are coming soon — send as text for now."
     )

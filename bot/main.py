@@ -12,7 +12,7 @@ from config import (
     TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USER_ID,
     TIMEZONE, DIGEST_HOUR, REPORT_DAY, REPORT_HOUR,
 )
-from bot.handlers import handle_text, handle_voice, error_handler
+from bot.handlers import handle_text, handle_voice, handle_document, error_handler
 from bot.commands import (
     cmd_start, cmd_help, cmd_tasks, cmd_decisions, cmd_career,
     cmd_digest, cmd_report, cmd_search, cmd_think,
@@ -98,6 +98,7 @@ def main() -> None:
     # Message handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & user_filter, handle_text))
     app.add_handler(MessageHandler(filters.VOICE & user_filter, handle_voice))
+    app.add_handler(MessageHandler(filters.Document.ALL & user_filter, handle_document))
 
     app.add_error_handler(error_handler)
 

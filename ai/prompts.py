@@ -167,6 +167,36 @@ PDP Data:
 {pdp_data}
 """
 
+PDP_DOCUMENT_EXTRACT_SYSTEM = """You are extracting Personal Development Plan (PDP) actions from a document.
+
+Today's date: {today}
+
+Extract every distinct PDP objective or action from the text. Respond ONLY with valid JSON — no preamble, no markdown fences.
+
+Return exactly this structure:
+{{
+  "pdp_actions": [
+    {{
+      "title": "concise action title (max 80 chars)",
+      "description": "fuller description of the objective",
+      "category": "leadership|technical|commercial|personal",
+      "objective": "the verbatim or near-verbatim wording from the document",
+      "target_date": "YYYY-MM-DD or null"
+    }}
+  ],
+  "summary": "one sentence describing what this PDP covers"
+}}
+
+Category guidance:
+- leadership: managing people, influencing, presenting, mentoring, stakeholder management
+- technical: engineering skills, certifications, qualifications, tools, methodologies
+- commercial: business development, client relationships, tendering, cost/value work
+- personal: wellbeing, communication, networking, cross-functional skills
+
+Extract ALL objectives. If target dates are mentioned (e.g. "by Q3", "before April review"), convert to a date.
+If no date is mentioned, use null.
+"""
+
 EXPORT_SYSTEM = """Generate a concise context block for Claude Code.
 Ryan uses this to load his current ideas and PDP status into AI coding sessions.
 

@@ -6,7 +6,7 @@ from config import ANTHROPIC_API_KEY, TIER_1_MODEL, TIER_2_MODEL, TIER_3_MODEL
 from ai.prompts import (
     EXTRACTION_SYSTEM, QUESTION_SYSTEM,
     DIGEST_SYSTEM, WEEKLY_REPORT_SYSTEM, DEEP_SYSTEM,
-    PDP_ANALYSIS_SYSTEM, EXPORT_SYSTEM,
+    PDP_ANALYSIS_SYSTEM, EXPORT_SYSTEM, PDP_DOCUMENT_EXTRACT_SYSTEM,
 )
 
 logger = logging.getLogger(__name__)
@@ -80,3 +80,17 @@ def analyse_pdp(pdp_data: str) -> str:
 def generate_export(data: str) -> str:
     system = EXPORT_SYSTEM.format(data=data)
     return _call(TIER_2_MODEL, system, "Generate the Claude Code context block.", max_tokens=800)
+
+
+def extract_pdp_from_document(document_text: str) -> dict:
+    today = date.today().isoformat()
+    system = PDP_DOCUMENT_EXTRACT_SYSTEM.format(today=today)
+    raw = _call(TIER_2_MODEL, system, document_text, max_tokens=2000)
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        raw = parts[1].lstrip("json").strip() if len(parts) > 1 else raw
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        logger.warning("PDP document extract JSON parse failed")
+        return {"pdp_actions": [], "summary": ""}
