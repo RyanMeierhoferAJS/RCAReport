@@ -34,6 +34,18 @@ def _base_context() -> str:
     except Exception:
         logger.warning("Failed to load decisions for context")
 
+    try:
+        ideas = db.get_ideas(limit=30)
+        if ideas:
+            parts.append("IDEAS:\n" + "\n".join(
+                f"- [{i.get('category', 'general')}] {i['title']}"
+                + (f" — {i['description'][:150]}" if i.get("description") else "")
+                + (f" ({i['status']})" if i.get("status") and i["status"] != "raw" else "")
+                for i in ideas
+            ))
+    except Exception:
+        logger.warning("Failed to load ideas for context")
+
     return "\n\n".join(parts)
 
 

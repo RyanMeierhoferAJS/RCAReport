@@ -64,13 +64,17 @@ Return exactly this structure:
 Known projects: Home Build, ERIP, Vibration Platform, RCA Automation, Ultrasound Bot, Track Car, PIA.
 
 Classification rules:
-- task: something that needs doing — "need to", "must", "order", "book", "call", "send", "check"
+- task: a concrete, assigned action to be done soon — "need to", "must", "order", "book", "call", "send", "check"
 - decision: a choice that was made — "decided", "going with", "chose", "will use", "agreed"
 - achievement: something accomplished — "completed", "finished", "avoided £X", "delivered", "got qualification"
-- idea: creative thought, concept, proposal — "idea:", "what if", "could we", "thinking about building", "concept:"
+- idea: a product/feature proposal, concept, or suggestion — even if phrased as "add X", "build X", "create X" when accompanied by rationale, benefits, or "advantage is / benefit is / this would / could we / what if"; proposals for new modules, tools, integrations, or improvements
 - pdp: evidence toward personal development plan — "PDP:", "that counts toward", "exceeded my", "for my review"
 - question: asks for information — ends with "?", starts with what/who/when/where/how/which/why/show/list/find
 - general: everything else
+
+KEY DISTINCTION — task vs idea:
+- task = something Ryan himself will do imminently ("order the part", "call John", "send the report")
+- idea = a proposal for something to build or implement, especially with reasoning or benefits stated ("add X as module — advantage is...", "what if we built Y")
 
 A message can contain multiple types. Use the dominant one for "classification".
 Only populate arrays when relevant — leave empty if nothing found.
