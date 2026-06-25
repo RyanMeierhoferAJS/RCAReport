@@ -59,8 +59,18 @@ def _fetch(label: str, url: str, target_date: date) -> list[dict]:
 
 def _get_events(target_date: date) -> list[dict]:
     events = []
+
+    # Microsoft Graph (AJS Outlook)
+    try:
+        from modules.graph import get_calendar_events
+        events.extend(get_calendar_events(target_date))
+    except Exception:
+        logger.warning("Graph calendar fetch failed", exc_info=True)
+
+    # iCal feeds (ASR, Home/Google)
     for label, url in CALENDAR_FEEDS:
         events.extend(_fetch(label, url, target_date))
+
     events.sort(key=lambda e: e["_sort"])
     return events
 

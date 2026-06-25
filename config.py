@@ -20,9 +20,14 @@ TIER_3_MODEL = "claude-opus-4-8"             # /think, /deep, RCA generation
 USER_ID = "ryan"
 TIMEZONE = "Europe/London"
 
-# Calendar iCal feeds — list of (label, url) tuples, blank URLs are skipped
+# Microsoft Graph — AJS Outlook calendar + email
+GRAPH_TENANT_ID:     str = os.environ.get("GRAPH_TENANT_ID", "")
+GRAPH_CLIENT_ID:     str = os.environ.get("GRAPH_CLIENT_ID", "")
+GRAPH_CLIENT_SECRET: str = os.environ.get("GRAPH_CLIENT_SECRET", "")
+GRAPH_USER_EMAIL:    str = os.environ.get("GRAPH_USER_EMAIL", "")
+
+# Calendar iCal feeds — fallback / additional feeds (blank = skipped)
 CALENDAR_FEEDS: list[tuple[str, str]] = [
-    ("AJS",  os.environ.get("CALENDAR_ICAL_URL_AJS",  "")),
     ("ASR",  os.environ.get("CALENDAR_ICAL_URL_ASR",  "")),
     ("Home", os.environ.get("CALENDAR_ICAL_URL_HOME", "")),
 ]
