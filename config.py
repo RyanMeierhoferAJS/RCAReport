@@ -19,6 +19,13 @@ TIER_3_MODEL = "claude-opus-4-8"             # /think, /deep, RCA generation
 
 USER_ID = "ryan"
 TIMEZONE = "Europe/London"
+
+# Calendar iCal feeds — list of (label, url) tuples, blank URLs are skipped
+CALENDAR_FEEDS: list[tuple[str, str]] = [
+    ("AJS",  os.environ.get("CALENDAR_ICAL_URL_AJS",  "")),
+    ("ASR",  os.environ.get("CALENDAR_ICAL_URL_ASR",  "")),
+    ("Home", os.environ.get("CALENDAR_ICAL_URL_HOME", "")),
+]
 DIGEST_HOUR = 7     # 07:00 London daily digest
 REPORT_DAY = "sun"  # Sunday weekly report
 REPORT_HOUR = 8     # 08:00

@@ -104,22 +104,25 @@ Memory context:
 DIGEST_SYSTEM = """You are generating Ryan's morning briefing for {today} ({day_of_week}).
 
 Format for Telegram. Use *bold* for headers, bullet points, keep it scannable.
-Under 350 words. No waffle.
+Under 400 words. No waffle.
 
 Structure:
 *Good morning, Ryan* — one sentence on the day
+
+*Today's Schedule*
+[meetings from calendar — show time, title, label. If none, omit section]
 
 *Priority Actions*
 [top 5 tasks by priority and due date]
 
 *Waiting For*
-[anything with status=waiting]
+[anything with status=waiting — omit if none]
 
 *Project Focus*
 [2-3 active projects with momentum or next milestone]
 
 *On Your Radar*
-[anything worth a flag — overdue tasks, stalled projects]
+[anything worth a flag — overdue tasks, stalled projects — omit if nothing]
 """
 
 WEEKLY_REPORT_SYSTEM = """You are generating Ryan's Sunday executive report.

@@ -16,7 +16,7 @@ from bot.handlers import handle_text, handle_voice, handle_document, error_handl
 from bot.commands import (
     cmd_start, cmd_help, cmd_tasks, cmd_decisions, cmd_career,
     cmd_digest, cmd_report, cmd_search, cmd_think,
-    cmd_ideas, cmd_pdp, cmd_export, cmd_done,
+    cmd_ideas, cmd_pdp, cmd_export, cmd_done, cmd_today,
 )
 from modules.digest import get_daily_digest
 from modules.weekly_report import get_weekly_report
@@ -85,6 +85,7 @@ def main() -> None:
     app.add_handler(CommandHandler("help",      cmd_help,      filters=user_filter))
     app.add_handler(CommandHandler("tasks",     cmd_tasks,     filters=user_filter))
     app.add_handler(CommandHandler("done",      cmd_done,      filters=user_filter))
+    app.add_handler(CommandHandler("today",     cmd_today,     filters=user_filter))
     app.add_handler(CommandHandler("decisions", cmd_decisions, filters=user_filter))
     app.add_handler(CommandHandler("career",    cmd_career,    filters=user_filter))
     app.add_handler(CommandHandler("digest",    cmd_digest,    filters=user_filter))

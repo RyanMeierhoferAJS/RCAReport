@@ -8,6 +8,7 @@ from modules.weekly_report import get_weekly_report
 from modules.search import search_and_answer, build_context_from_results
 from modules.ideas import get_formatted_ideas, format_ideas_for_export
 from modules.pdp import get_pdp_summary, format_pdp_for_export, format_pdp_for_ai_analysis
+from modules.calendar_feed import get_today_events, get_tomorrow_events, format_events
 from ai.router import deep_analysis, analyse_pdp, generate_export
 from db import client as db
 
@@ -21,6 +22,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "*Capture*\n"
         "/tasks — open tasks\n"
         "/done \\[number or title\\] — complete a task\n"
+        "/today — today's calendar \\+ tomorrow preview\n"
         "/decisions — recent decisions\n"
         "/career — career journal\n"
         "/ideas — idea bank\n"
@@ -92,6 +94,26 @@ async def cmd_done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"Multiple matches — which one?\n\n{options}\n\nReply `/done <number>`",
         parse_mode="Markdown",
     )
+
+
+async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    today_events    = get_today_events()
+    tomorrow_events = get_tomorrow_events()
+
+    parts = [f"*Schedule — {date.today().strftime('%A %-d %B')}*\n"]
+
+    if today_events:
+        parts.append(format_events(today_events))
+    else:
+        parts.append("_No meetings today_")
+
+    if tomorrow_events:
+        parts.append(f"\n*Tomorrow*\n{format_events(tomorrow_events)}")
+
+    if not today_events and not tomorrow_events:
+        parts.append("\n_Calendar feeds not configured yet — add iCal URLs to Railway env vars_")
+
+    await update.message.reply_text("\n".join(parts), parse_mode="Markdown")
 
 
 async def cmd_decisions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

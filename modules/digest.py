@@ -1,12 +1,27 @@
+import logging
 from datetime import date
 from db import client as db
 from ai.router import generate_digest
+from modules.calendar_feed import get_today_events, get_tomorrow_events, format_events_for_context
+
+logger = logging.getLogger(__name__)
 
 
 def _build_context() -> str:
     tasks    = db.get_open_tasks()
     projects = db.get_active_projects()
     parts    = []
+
+    # Calendar — today and a peek at tomorrow
+    try:
+        today_events    = get_today_events()
+        tomorrow_events = get_tomorrow_events()
+        if today_events:
+            parts.append("TODAY'S MEETINGS:\n" + format_events_for_context(today_events))
+        if tomorrow_events:
+            parts.append("TOMORROW'S MEETINGS:\n" + format_events_for_context(tomorrow_events))
+    except Exception:
+        logger.warning("Calendar fetch failed for digest")
 
     if tasks:
         waiting = [t for t in tasks if t.get("status") == "waiting"]
