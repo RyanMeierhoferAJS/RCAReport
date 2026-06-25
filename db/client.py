@@ -66,6 +66,18 @@ def complete_task_by_id(task_id: str) -> dict:
     return result.data[0]
 
 
+def find_open_tasks_by_title(partial: str) -> list[dict]:
+    """Case-insensitive substring match against open tasks."""
+    result = (
+        get_client().table("tasks")
+        .select("id, title, priority, status, project")
+        .in_("status", ["open", "in_progress", "waiting"])
+        .ilike("title", f"%{partial}%")
+        .execute()
+    )
+    return result.data
+
+
 def semantic_search_tasks(embedding: list[float], threshold: float = 0.45) -> list[dict]:
     result = get_client().rpc("semantic_search_tasks", {
         "query_embedding": embedding,

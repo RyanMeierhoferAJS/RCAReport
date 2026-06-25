@@ -57,6 +57,11 @@ Return exactly this structure:
       "exceeded": true
     }}
   ],
+  "completions": [
+    {{
+      "title": "partial task title that was completed"
+    }}
+  ],
   "projects_mentioned": ["project names found in message"],
   "response": "brief conversational confirmation for Ryan (1-2 sentences)"
 }}
@@ -71,6 +76,8 @@ Classification rules:
 - pdp: evidence toward personal development plan — "PDP:", "that counts toward", "exceeded my", "for my review"
 - question: asks for information — ends with "?", starts with what/who/when/where/how/which/why/show/list/find
 - general: everything else
+
+- completion: task that was just finished — "done", "finished", "completed", "just did", "sent", "ordered" referring to a past action → populate "completions" with the task title
 
 KEY DISTINCTION — task vs idea:
 - task = something Ryan himself will do imminently ("order the part", "call John", "send the report")

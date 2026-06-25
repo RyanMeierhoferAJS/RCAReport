@@ -20,6 +20,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Send me anything naturally — I'll extract tasks, decisions, achievements and ideas automatically.\n\n"
         "*Capture*\n"
         "/tasks — open tasks\n"
+        "/done \\[number or title\\] — complete a task\n"
         "/decisions — recent decisions\n"
         "/career — career journal\n"
         "/ideas — idea bank\n"
@@ -43,6 +44,54 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(tasks.get_formatted_open_tasks(), parse_mode="Markdown")
+
+
+async def cmd_done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    arg = " ".join(context.args).strip() if context.args else ""
+    if not arg:
+        await update.message.reply_text(
+            "Usage: `/done 3` or `/done partial title`", parse_mode="Markdown"
+        )
+        return
+
+    open_tasks = db.get_open_tasks()
+
+    # Number-based: /done 2
+    if arg.isdigit():
+        idx = int(arg) - 1
+        if idx < 0 or idx >= len(open_tasks):
+            await update.message.reply_text(f"No task number {arg}. Use /tasks to see the list.")
+            return
+        task = open_tasks[idx]
+        db.complete_task_by_id(task["id"])
+        await update.message.reply_text(f"✅ Done: *{task['title']}*", parse_mode="Markdown")
+        return
+
+    # Title-based: /done partial title — try DB ilike first, fall back to Python filter
+    matches = db.find_open_tasks_by_title(arg)
+    if not matches:
+        # Broader Python filter over already-fetched open tasks
+        lower = arg.lower()
+        matches = [t for t in open_tasks if lower in t["title"].lower()]
+
+    if not matches:
+        await update.message.reply_text(
+            f"No open task matching *{arg}*\. Use /tasks to see what's open.",
+            parse_mode="Markdown",
+        )
+        return
+
+    if len(matches) == 1:
+        db.complete_task_by_id(matches[0]["id"])
+        await update.message.reply_text(f"✅ Done: *{matches[0]['title']}*", parse_mode="Markdown")
+        return
+
+    # Multiple matches — ask for clarification
+    options = "\n".join(f"{i+1}. {t['title']}" for i, t in enumerate(matches[:5]))
+    await update.message.reply_text(
+        f"Multiple matches — which one?\n\n{options}\n\nReply `/done <number>`",
+        parse_mode="Markdown",
+    )
 
 
 async def cmd_decisions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

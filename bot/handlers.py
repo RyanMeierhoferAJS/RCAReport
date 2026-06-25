@@ -100,6 +100,22 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         stored.append(f"💡 *Idea:* {idea['title']}")
 
+    for completion in extracted.get("completions", []):
+        partial = completion.get("title", "").strip()
+        if not partial:
+            continue
+        matches = db.find_open_tasks_by_title(partial)
+        if not matches:
+            open_tasks = db.get_open_tasks()
+            lower = partial.lower()
+            matches = [t for t in open_tasks if lower in t["title"].lower()]
+        if len(matches) == 1:
+            db.complete_task_by_id(matches[0]["id"])
+            stored.append(f"✅ *Completed:* {matches[0]['title']}")
+        elif len(matches) > 1:
+            titles = ", ".join(t["title"] for t in matches[:3])
+            stored.append(f"⚠️ Multiple tasks match '{partial}' — use /done to pick one ({titles}…)")
+
     for pdp_ev in extracted.get("pdp_evidence", []):
         action_title = pdp_ev.get("action_title", "")
         evidence_text = pdp_ev.get("evidence", "")
