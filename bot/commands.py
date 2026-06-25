@@ -249,8 +249,7 @@ async def cmd_connect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     from modules.graph import start_device_code_flow, run_device_code_polling, _is_configured
     if not _is_configured():
         await update.message.reply_text(
-            "❌ `GRAPH_TENANT_ID` and `GRAPH_CLIENT_ID` must be set in Railway env vars first.",
-            parse_mode="Markdown",
+            "❌ GRAPH_TENANT_ID and GRAPH_CLIENT_ID must be set in Railway env vars first."
         )
         return
 
@@ -258,8 +257,9 @@ async def cmd_connect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         flow = start_device_code_flow()
     except Exception as exc:
         await update.message.reply_text(
-            f"❌ Couldn't start Microsoft login: `{exc}`\n\nCheck GRAPH\\_TENANT\\_ID and GRAPH\\_CLIENT\\_ID.",
-            parse_mode="Markdown",
+            f"❌ Couldn't start Microsoft login: {exc}\n\n"
+            "Check GRAPH_TENANT_ID and GRAPH_CLIENT_ID in Railway, and make sure "
+            "'Allow public client flows' is enabled in your Azure app."
         )
         return
 
@@ -270,12 +270,11 @@ async def cmd_connect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     device_code      = flow["device_code"]
 
     await update.message.reply_text(
-        f"*Connect PIA to Microsoft 365*\n\n"
-        f"1\\. Open: {verification_uri}\n"
-        f"2\\. Enter code: `{user_code}`\n"
-        f"3\\. Sign in with your AJS account \\(ryan\\.meierhofer@ajsassetcare\\.co\\.uk\\)\n\n"
-        f"_Code expires in {expires_in // 60} minutes\\. I'll notify you when connected\\._",
-        parse_mode="MarkdownV2",
+        f"🔗 Connect PIA to Microsoft 365\n\n"
+        f"1. Open: {verification_uri}\n"
+        f"2. Enter code: {user_code}\n"
+        f"3. Sign in with ryan.meierhofer@ajsassetcare.co.uk\n\n"
+        f"Code expires in {expires_in // 60} minutes. I'll notify you when connected."
     )
 
     asyncio.ensure_future(
