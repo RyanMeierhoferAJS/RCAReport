@@ -21,6 +21,7 @@ from bot.commands import (
 from modules.digest import get_daily_digest
 from modules.weekly_report import get_weekly_report
 from modules.email_poller import poll_emails
+from modules.gmail_poller import poll_gmail
 
 logging.basicConfig(
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
@@ -60,6 +61,17 @@ async def _poll_emails(app: Application) -> None:
         logger.exception("Email poll job failed")
 
 
+async def _poll_gmail(app: Application) -> None:
+    try:
+        messages = poll_gmail()
+        for msg in messages:
+            await app.bot.send_message(
+                chat_id=TELEGRAM_ALLOWED_USER_ID, text=msg, parse_mode="Markdown"
+            )
+    except Exception:
+        logger.exception("Gmail poll job failed")
+
+
 async def _post_init(app: Application) -> None:
     tz = pytz.timezone(TIMEZONE)
     scheduler = AsyncIOScheduler(timezone=tz)
@@ -84,6 +96,14 @@ async def _post_init(app: Application) -> None:
         minutes=15,
         args=[app],
         id="email_poll",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _poll_gmail,
+        "interval",
+        minutes=15,
+        args=[app],
+        id="gmail_poll",
         replace_existing=True,
     )
     scheduler.start()

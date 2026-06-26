@@ -25,6 +25,10 @@ GRAPH_TENANT_ID:  str = os.environ.get("GRAPH_TENANT_ID", "")
 GRAPH_CLIENT_ID:  str = os.environ.get("GRAPH_CLIENT_ID", "")
 GRAPH_USER_EMAIL: str = os.environ.get("GRAPH_USER_EMAIL", "")
 
+# Gmail IMAP — personal inbox email polling (app password, no OAuth)
+GMAIL_ADDRESS:      str = os.environ.get("GMAIL_ADDRESS", "")
+GMAIL_APP_PASSWORD: str = os.environ.get("GMAIL_APP_PASSWORD", "")
+
 # Calendar iCal feeds — fallback / additional feeds (blank = skipped)
 CALENDAR_FEEDS: list[tuple[str, str]] = [
     ("ASR",  os.environ.get("CALENDAR_ICAL_URL_ASR",  "")),
