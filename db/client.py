@@ -78,6 +78,63 @@ def find_open_tasks_by_title(partial: str) -> list[dict]:
     return result.data
 
 
+def get_due_tasks() -> dict[str, list[dict]]:
+    """Return overdue and due-today open tasks."""
+    today = date.today().isoformat()
+    base = (
+        get_client().table("tasks")
+        .select("id, title, priority, due_date, project")
+        .in_("status", ["open", "in_progress", "waiting"])
+        .not_.is_("due_date", "null")
+    )
+    overdue   = base.lt("due_date", today).order("due_date").execute().data
+    due_today = (
+        get_client().table("tasks")
+        .select("id, title, priority, due_date, project")
+        .in_("status", ["open", "in_progress", "waiting"])
+        .eq("due_date", today)
+        .order("priority")
+        .execute()
+    ).data
+    return {"overdue": overdue, "due_today": due_today}
+
+
+def get_project_summary() -> list[dict]:
+    """Aggregate open tasks + recent decisions by project."""
+    tasks = (
+        get_client().table("tasks")
+        .select("project, title, priority, status")
+        .in_("status", ["open", "in_progress", "waiting"])
+        .not_.is_("project", "null")
+        .execute()
+    ).data
+
+    decisions = (
+        get_client().table("decisions")
+        .select("project, title, decided_at")
+        .not_.is_("project", "null")
+        .order("decided_at", desc=True)
+        .limit(100)
+        .execute()
+    ).data
+
+    projects: dict[str, dict] = {}
+    for t in tasks:
+        p = t["project"]
+        if p not in projects:
+            projects[p] = {"name": p, "tasks": [], "decisions": []}
+        projects[p]["tasks"].append(t)
+
+    for d in decisions:
+        p = d["project"]
+        if p not in projects:
+            projects[p] = {"name": p, "tasks": [], "decisions": []}
+        if len(projects[p]["decisions"]) < 3:
+            projects[p]["decisions"].append(d)
+
+    return sorted(projects.values(), key=lambda x: len(x["tasks"]), reverse=True)
+
+
 def semantic_search_tasks(embedding: list[float], threshold: float = 0.45) -> list[dict]:
     result = get_client().rpc("semantic_search_tasks", {
         "query_embedding": embedding,

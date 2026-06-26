@@ -4,6 +4,7 @@ from datetime import date
 from telegram import Update
 from telegram.ext import ContextTypes
 from modules import tasks, decisions, career
+from modules.projects import get_project_dashboard
 from modules.digest import get_daily_digest
 from modules.weekly_report import get_weekly_report
 from modules.search import search_and_answer, build_context_from_results
@@ -23,7 +24,9 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "*Capture*\n"
         "/tasks — open tasks\n"
         "/done \\[number or title\\] — complete a task\n"
+        "/meeting — log meeting notes \\(extracts actions \\+ decisions\\)\n"
         "/today — today's calendar \\+ tomorrow preview\n"
+        "/projects — project dashboard\n"
         "/decisions — recent decisions\n"
         "/career — career journal\n"
         "/ideas — idea bank\n"
@@ -245,6 +248,80 @@ async def cmd_pdp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "/pdp analyse — AI analysis of your progress",
             parse_mode="Markdown",
         )
+
+
+async def cmd_projects(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(get_project_dashboard(), parse_mode="Markdown")
+
+
+async def cmd_meeting(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    notes = " ".join(context.args) if context.args else ""
+    if not notes:
+        await update.message.reply_text(
+            "Usage: /meeting with [name] about [topic] — [key points, decisions, actions]\n\n"
+            "Example: /meeting with Mark re HVAC — agreed £45k budget, "
+            "action: send PO by Friday, Mark to provide maintenance schedule",
+        )
+        return
+
+    await update.message.reply_text("_Processing meeting notes…_", parse_mode="Markdown")
+
+    # Hint the extraction engine this is a meeting — improves decision/task detection
+    hinted = f"MEETING NOTES: {notes}"
+    extracted = db.store_capture(raw_text=hinted, media_type="text")
+
+    from ai.router import extract_from_message
+    result = extract_from_message(hinted)
+
+    stored = []
+    for task in result.get("tasks", []):
+        db.create_task(
+            title=task["title"],
+            description=task.get("description"),
+            priority=task.get("priority", "medium"),
+            due_date=task.get("due_date"),
+            project=task.get("project"),
+            source_capture_id=extracted,
+        )
+        stored.append(f"✅ *Action:* {task['title']}")
+
+    for decision in result.get("decisions", []):
+        db.create_decision(
+            title=decision["title"],
+            description=decision.get("description"),
+            reason=decision.get("reason"),
+            alternatives=decision.get("alternatives", []),
+            project=decision.get("project"),
+            source_capture_id=extracted,
+        )
+        stored.append(f"🎯 *Decision:* {decision['title']}")
+
+    for achievement in result.get("achievements", []):
+        db.create_career_event(
+            type=achievement.get("type", "achievement"),
+            title=achievement["title"],
+            description=achievement.get("description"),
+            value_pounds=achievement.get("value_pounds"),
+            project=achievement.get("project"),
+            source_capture_id=extracted,
+        )
+        stored.append(f"🏆 *Noted:* {achievement['title']}")
+
+    for note in result.get("notes", []):
+        db.create_note(
+            content=note["content"],
+            tags=note.get("tags", []) + ["meeting"],
+            entities=note.get("entities", []),
+            project=note.get("project"),
+            source_capture_id=extracted,
+        )
+
+    if stored:
+        reply = f"*Meeting logged*\n\n" + "\n".join(stored)
+    else:
+        reply = "_Meeting captured as a note — no specific actions or decisions detected._"
+
+    await update.message.reply_text(reply, parse_mode="Markdown")
 
 
 async def cmd_draft(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

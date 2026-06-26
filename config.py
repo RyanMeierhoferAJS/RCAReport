@@ -34,6 +34,7 @@ CALENDAR_FEEDS: list[tuple[str, str]] = [
     ("ASR",  os.environ.get("CALENDAR_ICAL_URL_ASR",  "")),
     ("Home", os.environ.get("CALENDAR_ICAL_URL_HOME", "")),
 ]
-DIGEST_HOUR = 7     # 07:00 London daily digest
-REPORT_DAY = "sun"  # Sunday weekly report
-REPORT_HOUR = 8     # 08:00
+DIGEST_HOUR    = 7     # 07:00 London daily digest
+REMINDER_HOUR  = 12    # 12:00 midday overdue/due-today nudge
+REPORT_DAY     = "sun" # Sunday weekly report
+REPORT_HOUR    = 8     # 08:00

@@ -10,18 +10,20 @@ from apscheduler.triggers.cron import CronTrigger
 
 from config import (
     TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USER_ID,
-    TIMEZONE, DIGEST_HOUR, REPORT_DAY, REPORT_HOUR,
+    TIMEZONE, DIGEST_HOUR, REMINDER_HOUR, REPORT_DAY, REPORT_HOUR,
 )
 from bot.handlers import handle_text, handle_voice, handle_document, error_handler
 from bot.commands import (
     cmd_start, cmd_help, cmd_tasks, cmd_decisions, cmd_career,
     cmd_digest, cmd_report, cmd_search, cmd_think,
-    cmd_ideas, cmd_pdp, cmd_export, cmd_done, cmd_today, cmd_connect, cmd_draft,
+    cmd_ideas, cmd_pdp, cmd_export, cmd_done, cmd_today,
+    cmd_connect, cmd_draft, cmd_projects, cmd_meeting,
 )
 from modules.digest import get_daily_digest
 from modules.weekly_report import get_weekly_report
 from modules.email_poller import poll_emails
 from modules.gmail_poller import poll_gmail
+from modules.reminders import get_due_reminder
 
 logging.basicConfig(
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
@@ -61,6 +63,17 @@ async def _poll_emails(app: Application) -> None:
         logger.exception("Email poll job failed")
 
 
+async def _send_reminder(app: Application) -> None:
+    try:
+        msg = get_due_reminder()
+        if msg:
+            await app.bot.send_message(
+                chat_id=TELEGRAM_ALLOWED_USER_ID, text=msg, parse_mode="Markdown"
+            )
+    except Exception:
+        logger.exception("Midday reminder failed")
+
+
 async def _poll_gmail(app: Application) -> None:
     try:
         messages = poll_gmail()
@@ -88,6 +101,13 @@ async def _post_init(app: Application) -> None:
         CronTrigger(day_of_week=REPORT_DAY, hour=REPORT_HOUR, minute=0, timezone=tz),
         args=[app],
         id="weekly_report",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _send_reminder,
+        CronTrigger(hour=REMINDER_HOUR, minute=0, timezone=tz),
+        args=[app],
+        id="midday_reminder",
         replace_existing=True,
     )
     scheduler.add_job(
@@ -139,6 +159,8 @@ def main() -> None:
     app.add_handler(CommandHandler("export",    cmd_export,    filters=user_filter))
     app.add_handler(CommandHandler("connect",   cmd_connect,   filters=user_filter))
     app.add_handler(CommandHandler("draft",     cmd_draft,     filters=user_filter))
+    app.add_handler(CommandHandler("projects",  cmd_projects,  filters=user_filter))
+    app.add_handler(CommandHandler("meeting",   cmd_meeting,   filters=user_filter))
 
     # Message handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & user_filter, handle_text))
