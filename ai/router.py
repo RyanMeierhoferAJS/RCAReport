@@ -7,6 +7,7 @@ from ai.prompts import (
     EXTRACTION_SYSTEM, QUESTION_SYSTEM,
     DIGEST_SYSTEM, WEEKLY_REPORT_SYSTEM, DEEP_SYSTEM,
     PDP_ANALYSIS_SYSTEM, EXPORT_SYSTEM, PDP_DOCUMENT_EXTRACT_SYSTEM,
+    EMAIL_DRAFT_SYSTEM,
 )
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,25 @@ def analyse_pdp(pdp_data: str) -> str:
 def generate_export(data: str) -> str:
     system = EXPORT_SYSTEM.format(data=data)
     return _call(TIER_2_MODEL, system, "Generate the Claude Code context block.", max_tokens=800)
+
+
+def draft_email(prompt: str, context: str) -> dict:
+    from config import GMAIL_ADDRESS
+    today = date.today().isoformat()
+    system = EMAIL_DRAFT_SYSTEM.format(
+        today=today,
+        gmail_address=GMAIL_ADDRESS or "personal gmail",
+        context=context or "No relevant context found.",
+    )
+    raw = _call(TIER_2_MODEL, system, prompt, max_tokens=1000)
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        raw = parts[1].lstrip("json").strip() if len(parts) > 1 else raw
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        logger.warning("Email draft JSON parse failed")
+        return {}
 
 
 def extract_pdp_from_document(document_text: str) -> dict:

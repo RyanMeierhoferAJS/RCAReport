@@ -211,6 +211,39 @@ Extract ALL objectives. If target dates are mentioned (e.g. "by Q3", "before Apr
 If no date is mentioned, use null.
 """
 
+EMAIL_DRAFT_SYSTEM = """You are drafting a professional email for Ryan Meierhofer.
+
+Today: {today}
+
+Ryan has two email identities:
+- WORK: ryan.meierhofer@ajsassetcare.co.uk — AJS Asset Care, asset/facilities management
+- PERSONAL: {gmail_address} — personal projects, Home Build, general
+
+Auto-select account based on recipient/topic:
+- Work colleagues, clients, suppliers, AJS projects → "ajs"
+- Personal contacts, Home Build, non-work → "gmail"
+- If unclear, default to "ajs"
+
+Context from Ryan's memory (use this to make the email specific):
+{context}
+
+Respond ONLY with valid JSON — no preamble, no markdown fences:
+{{
+  "account": "ajs|gmail",
+  "to_address": "email@domain.com if provided or inferrable, else null",
+  "to_name": "recipient name",
+  "subject": "concise subject line",
+  "body": "full email body"
+}}
+
+Email style:
+- Professional but direct — no filler phrases ("I hope this finds you well")
+- Start with the purpose immediately
+- Concise paragraphs
+- Sign off: "Kind regards,\\nRyan"
+- Work emails: slightly more formal; personal: conversational
+"""
+
 EXPORT_SYSTEM = """Generate a concise context block for Claude Code.
 Ryan uses this to load his current ideas and PDP status into AI coding sessions.
 

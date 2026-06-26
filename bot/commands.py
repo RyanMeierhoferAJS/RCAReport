@@ -10,7 +10,7 @@ from modules.search import search_and_answer, build_context_from_results
 from modules.ideas import get_formatted_ideas, format_ideas_for_export
 from modules.pdp import get_pdp_summary, format_pdp_for_export, format_pdp_for_ai_analysis
 from modules.calendar_feed import get_today_events, get_tomorrow_events, format_events
-from ai.router import deep_analysis, analyse_pdp, generate_export
+from ai.router import deep_analysis, analyse_pdp, generate_export, draft_email
 from db import client as db
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "*AI Exports*\n"
         "/export — Claude Code context block\n"
         "/pdp analyse — AI review of your PDP progress\n\n"
+        "*Email*\n"
+        "/draft — draft an email \\(saves to Gmail or Outlook drafts\\)\n\n"
         "*Integrations*\n"
         "/connect — link Microsoft 365 \\(calendar \\+ email\\)\n\n"
         "/help — show this",
@@ -243,6 +245,51 @@ async def cmd_pdp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "/pdp analyse — AI analysis of your progress",
             parse_mode="Markdown",
         )
+
+
+async def cmd_draft(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from modules.email_drafter import save_draft
+    from modules.search import build_context_from_results
+    prompt = " ".join(context.args) if context.args else ""
+    if not prompt:
+        await update.message.reply_text(
+            "Usage: /draft to [name/email] about [topic and key points]\n\n"
+            "Example: /draft to Mark about the HVAC quote, need it by end of month"
+        )
+        return
+
+    await update.message.reply_text("_Drafting email…_", parse_mode="Markdown")
+
+    # Search memory for relevant context
+    results = db.full_search(prompt)
+    ctx_text = build_context_from_results(results)
+
+    draft = draft_email(prompt, ctx_text)
+    if not draft or not draft.get("subject"):
+        await update.message.reply_text("Couldn't generate a draft — try being more specific.")
+        return
+
+    account    = draft.get("account", "gmail")
+    to_addr    = draft.get("to_address") or ""
+    to_name    = draft.get("to_name", to_addr)
+    subject    = draft["subject"]
+    body       = draft["body"]
+
+    # Save to appropriate drafts folder
+    saved, label = save_draft(account, to_addr, subject, body)
+
+    # Send preview to Telegram
+    to_line  = f"To: {to_name}" + (f" <{to_addr}>" if to_addr and to_addr != to_name else "")
+    saved_line = f"_Saved to {label} Drafts_" if saved else "_Could not save to drafts — copy below_"
+
+    preview = (
+        f"*Draft ready*\n"
+        f"{to_line}\n"
+        f"Subject: {subject}\n"
+        f"{saved_line}\n\n"
+        f"```\n{body}\n```"
+    )
+    await update.message.reply_text(preview, parse_mode="Markdown")
 
 
 async def cmd_connect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
