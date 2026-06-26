@@ -17,7 +17,7 @@ from bot.commands import (
     cmd_start, cmd_help, cmd_tasks, cmd_decisions, cmd_career,
     cmd_digest, cmd_report, cmd_search, cmd_think,
     cmd_ideas, cmd_pdp, cmd_export, cmd_done, cmd_today,
-    cmd_connect, cmd_draft, cmd_projects, cmd_meeting,
+    cmd_connect, cmd_draft, cmd_reply, cmd_projects, cmd_meeting, cmd_status,
 )
 from modules.digest import get_daily_digest
 from modules.weekly_report import get_weekly_report
@@ -157,8 +157,10 @@ def main() -> None:
     app.add_handler(CommandHandler("ideas",     cmd_ideas,     filters=user_filter))
     app.add_handler(CommandHandler("pdp",       cmd_pdp,       filters=user_filter))
     app.add_handler(CommandHandler("export",    cmd_export,    filters=user_filter))
+    app.add_handler(CommandHandler("status",    cmd_status,    filters=user_filter))
     app.add_handler(CommandHandler("connect",   cmd_connect,   filters=user_filter))
     app.add_handler(CommandHandler("draft",     cmd_draft,     filters=user_filter))
+    app.add_handler(CommandHandler("reply",     cmd_reply,     filters=user_filter))
     app.add_handler(CommandHandler("projects",  cmd_projects,  filters=user_filter))
     app.add_handler(CommandHandler("meeting",   cmd_meeting,   filters=user_filter))
 

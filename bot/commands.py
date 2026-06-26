@@ -39,8 +39,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "*AI Exports*\n"
         "/export — Claude Code context block\n"
         "/pdp analyse — AI review of your PDP progress\n\n"
+        "/status — quick snapshot \\(meetings \\+ top tasks\\)\n\n"
         "*Email*\n"
-        "/draft — draft an email \\(saves to Gmail or Outlook drafts\\)\n\n"
+        "/draft — draft an email \\(saves to Gmail or Outlook drafts\\)\n"
+        "/reply — draft an email reply\n\n"
         "*Integrations*\n"
         "/connect — link Microsoft 365 \\(calendar \\+ email\\)\n\n"
         "/help — show this",
@@ -250,6 +252,40 @@ async def cmd_pdp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
 
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    today_events    = get_today_events()
+    open_tasks      = db.get_open_tasks()
+    due             = db.get_due_tasks()
+    overdue_count   = len(due["overdue"])
+    due_today_count = len(due["due_today"])
+
+    lines = [f"*Status — {date.today().strftime('%A %-d %B')}*\n"]
+
+    if today_events:
+        lines.append("*Meetings*")
+        lines.append(format_events(today_events))
+    else:
+        lines.append("_No meetings today_")
+
+    lines.append("\n*Top tasks*")
+    if open_tasks:
+        for t in open_tasks[:3]:
+            pri  = f"[{t['priority'].upper()}] " if t.get("priority") else ""
+            proj = f" ({t['project']})" if t.get("project") else ""
+            lines.append(f"• {pri}{t['title']}{proj}")
+        if len(open_tasks) > 3:
+            lines.append(f"_…{len(open_tasks) - 3} more — /tasks_")
+    else:
+        lines.append("_All clear_ ✓")
+
+    if overdue_count:
+        lines.append(f"\n⚠️ *{overdue_count} overdue* — use /tasks to review")
+    elif due_today_count:
+        lines.append(f"\n📅 *{due_today_count} due today*")
+
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
 async def cmd_projects(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(get_project_dashboard(), parse_mode="Markdown")
 
@@ -367,6 +403,47 @@ async def cmd_draft(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"```\n{body}\n```"
     )
     await update.message.reply_text(preview, parse_mode="Markdown")
+
+
+async def cmd_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from modules.email_drafter import save_draft
+    from modules.search import build_context_from_results
+    prompt = " ".join(context.args) if context.args else ""
+    if not prompt:
+        await update.message.reply_text(
+            "Usage: /reply to [name] re [topic] — [what you want to say]\n\n"
+            "Example: /reply to Mark re HVAC quote — ask for breakdown, mention £45k budget"
+        )
+        return
+
+    await update.message.reply_text("_Drafting reply…_", parse_mode="Markdown")
+
+    results  = db.full_search(prompt)
+    ctx_text = build_context_from_results(results)
+    draft    = draft_email(f"REPLY TO EMAIL: {prompt}", ctx_text)
+
+    if not draft or not draft.get("subject"):
+        await update.message.reply_text("Couldn't generate a reply — try being more specific.")
+        return
+
+    account  = draft.get("account", "gmail")
+    to_addr  = draft.get("to_address") or ""
+    to_name  = draft.get("to_name", to_addr)
+    subject  = draft["subject"]
+    body     = draft["body"]
+
+    if not subject.lower().startswith("re:"):
+        subject = f"Re: {subject}"
+
+    saved, label = save_draft(account, to_addr, subject, body)
+
+    to_line    = f"To: {to_name}" + (f" <{to_addr}>" if to_addr and to_addr != to_name else "")
+    saved_line = f"_Saved to {label} Drafts_" if saved else "_Could not save — copy below_"
+
+    await update.message.reply_text(
+        f"*Reply ready*\n{to_line}\nSubject: {subject}\n{saved_line}\n\n```\n{body}\n```",
+        parse_mode="Markdown",
+    )
 
 
 async def cmd_connect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
