@@ -81,13 +81,15 @@ def find_open_tasks_by_title(partial: str) -> list[dict]:
 def get_due_tasks() -> dict[str, list[dict]]:
     """Return overdue and due-today open tasks."""
     today = date.today().isoformat()
-    base = (
+    # NULL due_dates are excluded naturally by lt/eq comparisons in PostgreSQL
+    overdue = (
         get_client().table("tasks")
         .select("id, title, priority, due_date, project")
         .in_("status", ["open", "in_progress", "waiting"])
-        .not_.is_("due_date", "null")
-    )
-    overdue   = base.lt("due_date", today).order("due_date").execute().data
+        .lt("due_date", today)
+        .order("due_date")
+        .execute()
+    ).data
     due_today = (
         get_client().table("tasks")
         .select("id, title, priority, due_date, project")
@@ -105,14 +107,14 @@ def get_project_summary() -> list[dict]:
         get_client().table("tasks")
         .select("project, title, priority, status")
         .in_("status", ["open", "in_progress", "waiting"])
-        .not_.is_("project", "null")
+        .filter("project", "not.is", "null")
         .execute()
     ).data
 
     decisions = (
         get_client().table("decisions")
         .select("project, title, decided_at")
-        .not_.is_("project", "null")
+        .filter("project", "not.is", "null")
         .order("decided_at", desc=True)
         .limit(100)
         .execute()
