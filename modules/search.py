@@ -145,7 +145,7 @@ def build_context_from_results(results: dict[str, list[dict]]) -> str:
     return "\n\n".join(parts)
 
 
-def search_and_answer(query: str) -> str:
+def search_and_answer(query: str, history: list[dict] | None = None) -> str:
     base = _base_context()
     semantic = _semantic_context(query)
 
@@ -154,4 +154,4 @@ def search_and_answer(query: str) -> str:
     if not context:
         return "I don't have any data stored yet. Try sending me some tasks or decisions first."
 
-    return answer_question(query, context)
+    return answer_question(query, context, history)

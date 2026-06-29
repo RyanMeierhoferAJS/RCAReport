@@ -46,10 +46,17 @@ def extract_from_message(text: str) -> dict:
         }
 
 
-def answer_question(question: str, context: str) -> str:
+def answer_question(question: str, context: str, history: list[dict] | None = None) -> str:
     today = date.today().isoformat()
     system = QUESTION_SYSTEM.format(today=today, context=context)
-    return _call(TIER_2_MODEL, system, question, max_tokens=1024)
+    messages = list(history or []) + [{"role": "user", "content": question}]
+    response = _client.messages.create(
+        model=TIER_2_MODEL,
+        max_tokens=1024,
+        system=system,
+        messages=messages,
+    )
+    return response.content[0].text.strip()
 
 
 def generate_digest(context: str) -> str:

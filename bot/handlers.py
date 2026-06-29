@@ -1,5 +1,6 @@
 import io
 import logging
+from collections import deque
 from telegram import Update
 from telegram.ext import ContextTypes
 from ai.router import extract_from_message, extract_pdp_from_document
@@ -8,6 +9,22 @@ from db import client as db
 from bot.utils import safe_reply as _safe_reply
 
 logger = logging.getLogger(__name__)
+
+# Per-chat conversation history — last 10 turns (5 user+assistant pairs)
+_chat_history: dict[int, deque] = {}
+_HISTORY_MAX = 10
+
+
+def _get_history(chat_id: int) -> list[dict]:
+    return list(_chat_history.get(chat_id, []))
+
+
+def _save_history(chat_id: int, user_text: str, assistant_text: str) -> None:
+    if chat_id not in _chat_history:
+        _chat_history[chat_id] = deque(maxlen=_HISTORY_MAX)
+    h = _chat_history[chat_id]
+    h.append({"role": "user", "content": user_text})
+    h.append({"role": "assistant", "content": assistant_text})
 
 
 _QUESTION_STARTERS = (
@@ -35,9 +52,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         media_type="text",
     )
 
+    history = _get_history(chat_id)
+
     # Fast-path for obvious questions — skip Tier 1 extraction
     if _looks_like_question(text):
-        result = search_and_answer(text)
+        result = search_and_answer(text, history)
+        _save_history(chat_id, text, result)
         await _safe_reply(update, result)
         return
 
@@ -46,7 +66,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     # If AI also classified it as a question, answer it
     if extracted.get("classification") == "question":
-        result = search_and_answer(text)
+        result = search_and_answer(text, history)
+        _save_history(chat_id, text, result)
         await _safe_reply(update, result)
         return
 
@@ -149,6 +170,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     elif not reply:
         reply = "Got it, stored."
 
+    _save_history(chat_id, text, reply)
     await _safe_reply(update, reply)
 
 
