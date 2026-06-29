@@ -1,6 +1,5 @@
 import io
 import logging
-from collections import deque
 from telegram import Update
 from telegram.ext import ContextTypes
 from ai.router import extract_from_message, extract_pdp_from_document
@@ -10,21 +9,24 @@ from bot.utils import safe_reply as _safe_reply
 
 logger = logging.getLogger(__name__)
 
-# Per-chat conversation history — last 10 turns (5 user+assistant pairs)
-_chat_history: dict[int, deque] = {}
-_HISTORY_MAX = 10
+# How many recent turns to send to Claude (full history stored in Supabase)
+_HISTORY_WINDOW = 20
 
 
 def _get_history(chat_id: int) -> list[dict]:
-    return list(_chat_history.get(chat_id, []))
+    try:
+        return db.get_conversation_history(chat_id, limit=_HISTORY_WINDOW)
+    except Exception:
+        logger.warning("Failed to load conversation history for chat %s", chat_id)
+        return []
 
 
 def _save_history(chat_id: int, user_text: str, assistant_text: str) -> None:
-    if chat_id not in _chat_history:
-        _chat_history[chat_id] = deque(maxlen=_HISTORY_MAX)
-    h = _chat_history[chat_id]
-    h.append({"role": "user", "content": user_text})
-    h.append({"role": "assistant", "content": assistant_text})
+    try:
+        db.append_conversation(chat_id, "user", user_text)
+        db.append_conversation(chat_id, "assistant", assistant_text)
+    except Exception:
+        logger.warning("Failed to save conversation history for chat %s", chat_id)
 
 
 _QUESTION_STARTERS = (

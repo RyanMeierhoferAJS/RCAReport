@@ -427,3 +427,36 @@ def store_daily_digest(content: str, digest_date: date) -> None:
         "content": content,
         "digest_date": digest_date.isoformat(),
     }).execute()
+
+
+# ── Conversation history ───────────────────────────────────────────────────────
+# Required Supabase migration:
+#   create table conversation_history (
+#     id bigserial primary key,
+#     chat_id bigint not null,
+#     role text not null,          -- 'user' or 'assistant'
+#     content text not null,
+#     created_at timestamptz default now()
+#   );
+#   create index on conversation_history (chat_id, created_at);
+
+def append_conversation(chat_id: int, role: str, content: str) -> None:
+    get_client().table("conversation_history").insert({
+        "chat_id": chat_id,
+        "role": role,
+        "content": content,
+    }).execute()
+
+
+def get_conversation_history(chat_id: int, limit: int = 20) -> list[dict]:
+    """Return last `limit` turns as [{"role": ..., "content": ...}, ...]."""
+    result = (
+        get_client().table("conversation_history")
+        .select("role, content")
+        .eq("chat_id", chat_id)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    # Reverse so oldest is first (Claude expects chronological order)
+    return list(reversed(result.data or []))
