@@ -8,9 +8,20 @@ from db import client as db
 
 logger = logging.getLogger(__name__)
 
+
+async def _safe_reply(update: Update, text: str) -> None:
+    """Send reply with Markdown; fall back to plain text if parse fails."""
+    try:
+        await update.message.reply_text(text, parse_mode="Markdown")
+    except Exception:
+        await update.message.reply_text(text)
+
+
 _QUESTION_STARTERS = (
     "what", "who", "when", "where", "how", "which", "why",
     "show", "list", "find", "tell", "have i", "did i",
+    "do i have", "am i", "any ", "meetings", "calendar",
+    "tasks", "decisions", "ideas", "remind", "summarise", "summarize",
 )
 
 
@@ -34,7 +45,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # Fast-path for obvious questions — skip Tier 1 extraction
     if _looks_like_question(text):
         result = search_and_answer(text)
-        await update.message.reply_text(result, parse_mode="Markdown")
+        await _safe_reply(update, result)
         return
 
     # Tier 1: classify and extract structured entities
@@ -43,7 +54,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # If AI also classified it as a question, answer it
     if extracted.get("classification") == "question":
         result = search_and_answer(text)
-        await update.message.reply_text(result, parse_mode="Markdown")
+        await _safe_reply(update, result)
         return
 
     stored = []
@@ -145,7 +156,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     elif not reply:
         reply = "Got it, stored."
 
-    await update.message.reply_text(reply, parse_mode="Markdown")
+    await _safe_reply(update, reply)
 
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
