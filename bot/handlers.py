@@ -5,16 +5,9 @@ from telegram.ext import ContextTypes
 from ai.router import extract_from_message, extract_pdp_from_document
 from modules.search import search_and_answer
 from db import client as db
+from bot.utils import safe_reply as _safe_reply
 
 logger = logging.getLogger(__name__)
-
-
-async def _safe_reply(update: Update, text: str) -> None:
-    """Send reply with Markdown; fall back to plain text if parse fails."""
-    try:
-        await update.message.reply_text(text, parse_mode="Markdown")
-    except Exception:
-        await update.message.reply_text(text)
 
 
 _QUESTION_STARTERS = (
@@ -260,6 +253,11 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logger.error("Unhandled exception", exc_info=context.error)
+    err = context.error
+    logger.error("Unhandled exception", exc_info=err)
     if isinstance(update, Update) and update.message:
-        await update.message.reply_text("Something went wrong — please try again.")
+        err_type = type(err).__name__
+        err_msg  = str(err)[:200]
+        await update.message.reply_text(
+            f"Error ({err_type}): {err_msg}\n\nCheck Railway logs for full traceback."
+        )

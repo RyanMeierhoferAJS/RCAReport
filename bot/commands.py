@@ -13,6 +13,7 @@ from modules.pdp import get_pdp_summary, format_pdp_for_export, format_pdp_for_a
 from modules.calendar_feed import get_today_events, get_tomorrow_events, format_events
 from ai.router import deep_analysis, analyse_pdp, generate_export, draft_email
 from db import client as db
+from bot.utils import safe_reply
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(tasks.get_formatted_open_tasks(), parse_mode="Markdown")
+    await safe_reply(update, tasks.get_formatted_open_tasks())
 
 
 async def cmd_done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -127,21 +128,21 @@ async def cmd_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_decisions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(decisions.get_formatted_decisions(), parse_mode="Markdown")
+    await safe_reply(update, decisions.get_formatted_decisions())
 
 
 async def cmd_career(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(career.get_career_summary(), parse_mode="Markdown")
+    await safe_reply(update, career.get_career_summary())
 
 
 async def cmd_digest(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("_Generating your briefing…_", parse_mode="Markdown")
-    await update.message.reply_text(get_daily_digest(), parse_mode="Markdown")
+    await safe_reply(update, get_daily_digest())
 
 
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("_Generating weekly report…_", parse_mode="Markdown")
-    await update.message.reply_text(get_weekly_report(), parse_mode="Markdown")
+    await safe_reply(update, get_weekly_report())
 
 
 async def cmd_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -150,7 +151,7 @@ async def cmd_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await update.message.reply_text("Usage: /search \\[your query\\]", parse_mode="Markdown")
         return
     await update.message.reply_text(f"_Searching for: {query}…_", parse_mode="Markdown")
-    await update.message.reply_text(search_and_answer(query), parse_mode="Markdown")
+    await safe_reply(update, search_and_answer(query))
 
 
 async def cmd_think(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -165,7 +166,7 @@ async def cmd_think(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     results = db.full_search(query)
     ctx_text = build_context_from_results(results)
     result = deep_analysis(query, ctx_text or "No relevant context found in memory.")
-    await update.message.reply_text(result, parse_mode="Markdown")
+    await safe_reply(update, result)
 
 
 async def cmd_ideas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -176,14 +177,14 @@ async def cmd_ideas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "Usage: /ideas \\[raw|refined|parked|shipped\\]", parse_mode="Markdown"
         )
         return
-    await update.message.reply_text(get_formatted_ideas(status_filter), parse_mode="Markdown")
+    await safe_reply(update, get_formatted_ideas(status_filter))
 
 
 async def cmd_pdp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     args = context.args or []
 
     if not args:
-        await update.message.reply_text(get_pdp_summary(), parse_mode="Markdown")
+        await safe_reply(update, get_pdp_summary())
         return
 
     subcmd = args[0].lower()
@@ -214,7 +215,7 @@ async def cmd_pdp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return
         pdp_text = format_pdp_for_ai_analysis(actions)
         result = analyse_pdp(pdp_text)
-        await update.message.reply_text(result, parse_mode="Markdown")
+        await safe_reply(update, result)
 
     elif subcmd == "exceeded":
         rest = " ".join(args[1:])
@@ -287,7 +288,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_projects(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(get_project_dashboard(), parse_mode="Markdown")
+    await safe_reply(update, get_project_dashboard())
 
 
 async def cmd_meeting(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -357,7 +358,7 @@ async def cmd_meeting(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     else:
         reply = "_Meeting captured as a note — no specific actions or decisions detected._"
 
-    await update.message.reply_text(reply, parse_mode="Markdown")
+    await safe_reply(update, reply)
 
 
 async def cmd_draft(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -402,7 +403,7 @@ async def cmd_draft(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"{saved_line}\n\n"
         f"```\n{body}\n```"
     )
-    await update.message.reply_text(preview, parse_mode="Markdown")
+    await safe_reply(update, preview)
 
 
 async def cmd_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -440,9 +441,9 @@ async def cmd_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     to_line    = f"To: {to_name}" + (f" <{to_addr}>" if to_addr and to_addr != to_name else "")
     saved_line = f"_Saved to {label} Drafts_" if saved else "_Could not save — copy below_"
 
-    await update.message.reply_text(
+    await safe_reply(
+        update,
         f"*Reply ready*\n{to_line}\nSubject: {subject}\n{saved_line}\n\n```\n{body}\n```",
-        parse_mode="Markdown",
     )
 
 
@@ -513,4 +514,4 @@ PDP ACTIONS:
 
     export_block = generate_export(data)
     header = f"*PIA Brain Export — {date.today().isoformat()}*\nPaste this at the start of a Claude Code session:\n\n"
-    await update.message.reply_text(header + f"```\n{export_block}\n```", parse_mode="Markdown")
+    await safe_reply(update, header + f"```\n{export_block}\n```")
