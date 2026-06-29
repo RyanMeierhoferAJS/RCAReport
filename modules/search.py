@@ -1,13 +1,33 @@
 import logging
 from db import client as db
 from ai.router import answer_question
+from modules.calendar_feed import get_upcoming_events, format_events_for_context
 
 logger = logging.getLogger(__name__)
 
 
 def _base_context() -> str:
-    """Always-present context: open tasks + recent decisions."""
+    """Always-present context: open tasks + recent decisions + today's meetings."""
     parts = []
+
+    try:
+        upcoming = get_upcoming_events(days=14)
+        if upcoming:
+            parts.append("UPCOMING MEETINGS (next 14 days):\n" + format_events_for_context(upcoming, group_by_date=True))
+    except Exception:
+        logger.warning("Failed to load calendar events for context")
+
+    try:
+        from modules.graph import get_recent_emails
+        emails = get_recent_emails(hours=24)
+        if emails:
+            lines = [
+                f"- From: {e['from_name']} | Subject: {e['subject']} | {e['received'][:10]}\n  {e['preview'][:200]}"
+                for e in emails
+            ]
+            parts.append("RECENT EMAILS (last 24h):\n" + "\n".join(lines))
+    except Exception:
+        logger.warning("Failed to load recent emails for context")
 
     try:
         tasks = db.get_open_tasks()
