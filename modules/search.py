@@ -1,13 +1,24 @@
 import logging
 from db import client as db
 from ai.router import answer_question
+from modules.calendar_feed import get_today_events, get_tomorrow_events, format_events_for_context
 
 logger = logging.getLogger(__name__)
 
 
 def _base_context() -> str:
-    """Always-present context: open tasks + recent decisions."""
+    """Always-present context: open tasks + recent decisions + today's meetings."""
     parts = []
+
+    try:
+        today_events = get_today_events()
+        if today_events:
+            parts.append("TODAY'S MEETINGS:\n" + format_events_for_context(today_events))
+        tomorrow_events = get_tomorrow_events()
+        if tomorrow_events:
+            parts.append("TOMORROW'S MEETINGS:\n" + format_events_for_context(tomorrow_events))
+    except Exception:
+        logger.warning("Failed to load calendar events for context")
 
     try:
         tasks = db.get_open_tasks()
