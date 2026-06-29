@@ -201,12 +201,43 @@ def _get(path: str, params: dict | None = None) -> dict | None:
 
 # ── Calendar ──────────────────────────────────────────────────────────────────
 
+def _parse_graph_datetime(raw: str, tz: ZoneInfo) -> datetime:
+    if "+" in raw or raw.endswith("Z"):
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(tz)
+    return datetime.fromisoformat(raw).replace(tzinfo=tz)
+
+
+def _graph_items_to_events(items: list[dict]) -> list[dict]:
+    events = []
+    for item in items:
+        is_allday   = item.get("isAllDay", False)
+        start_local = _parse_graph_datetime(item["start"]["dateTime"], _TZ)
+        end_local   = _parse_graph_datetime(item["end"]["dateTime"], _TZ)
+        location    = (item.get("location") or {}).get("displayName", "").strip()
+        teams_url   = (item.get("onlineMeeting") or {}).get("joinUrl", "")
+        events.append({
+            "start_time": "All day" if is_allday else start_local.strftime("%H:%M"),
+            "end_time":   "" if is_allday else end_local.strftime("%H:%M"),
+            "date":       start_local.date(),
+            "title":      item.get("subject", "Untitled"),
+            "location":   location[:80] if location else "",
+            "teams_url":  teams_url,
+            "label":      "AJS",
+            "_sort":      start_local,
+        })
+    return events
+
+
 def get_calendar_events(target_date: date) -> list[dict]:
+    return get_calendar_events_range(target_date, target_date)
+
+
+def get_calendar_events_range(start_date: date, end_date: date) -> list[dict]:
     if not _is_configured():
         return []
 
-    start = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=_TZ)
-    end   = start + timedelta(days=1)
+    start = datetime(start_date.year, start_date.month, start_date.day, 0, 0, 0, tzinfo=_TZ)
+    end   = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59, tzinfo=_TZ)
 
     data = _get(
         "/me/calendarView",
@@ -215,40 +246,13 @@ def get_calendar_events(target_date: date) -> list[dict]:
             "endDateTime":   end.isoformat(),
             "$select":       "subject,start,end,location,isAllDay,onlineMeeting,bodyPreview",
             "$orderby":      "start/dateTime",
-            "$top":          "50",
+            "$top":          "100",
         },
     )
     if not data:
         return []
 
-    events = []
-    for item in data.get("value", []):
-        is_allday = item.get("isAllDay", False)
-        start_raw = item["start"]["dateTime"]
-        end_raw   = item["end"]["dateTime"]
-
-        def _parse(raw: str) -> datetime:
-            if "+" in raw or raw.endswith("Z"):
-                return datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(_TZ)
-            return datetime.fromisoformat(raw).replace(tzinfo=_TZ)
-
-        start_local = _parse(start_raw)
-        end_local   = _parse(end_raw)
-
-        location  = (item.get("location") or {}).get("displayName", "").strip()
-        teams_url = (item.get("onlineMeeting") or {}).get("joinUrl", "")
-
-        events.append({
-            "start_time": "All day" if is_allday else start_local.strftime("%H:%M"),
-            "end_time":   "" if is_allday else end_local.strftime("%H:%M"),
-            "title":      item.get("subject", "Untitled"),
-            "location":   location[:80] if location else "",
-            "teams_url":  teams_url,
-            "label":      "AJS",
-            "_sort":      start_local,
-        })
-
-    return events
+    return _graph_items_to_events(data.get("value", []))
 
 
 # ── Email ─────────────────────────────────────────────────────────────────────
